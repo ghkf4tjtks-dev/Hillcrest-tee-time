@@ -187,7 +187,7 @@ UNAVAILABLE_PHRASES = [
 
 def _set_holes(page) -> None:
     try:
-        page.get_by_role("button", name=HOLES, exact=True).click(timeout=5000)
+        page.get_by_text(HOLES, exact=True).first.click(timeout=5000)
         log(f"Set holes to {HOLES}.")
     except Exception:
         log("Could not find a holes selector -- leaving default and continuing.")
@@ -202,15 +202,15 @@ def _set_players(page) -> None:
         log(f"Set players to {NUM_PLAYERS}.")
     except Exception:
         try:
-            page.get_by_role("button", name=str(NUM_PLAYERS), exact=True).click(timeout=5000)
-            log(f"Set players to {NUM_PLAYERS} via button.")
+            page.get_by_text(str(NUM_PLAYERS), exact=True).first.click(timeout=5000)
+            log(f"Set players to {NUM_PLAYERS} via text match.")
         except Exception:
             log("Could not find a players selector -- leaving default and continuing.")
 
 
 def _set_cart(page) -> None:
     try:
-        page.get_by_role("button", name=CART, exact=True).click(timeout=5000)
+        page.get_by_text(CART, exact=True).first.click(timeout=5000)
         log(f"Set cart to {CART}.")
     except Exception:
         log("Could not find a cart selector -- leaving default and continuing.")
