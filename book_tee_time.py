@@ -1,4 +1,3 @@
-"""
 Hillcrest Golf Club (foreUP) tee time auto-booker.
 
 Logs in, waits until exactly 7:00:00 PM America/Denver time, then grabs the
@@ -17,6 +16,9 @@ Optional environment variables:
                          before the 7:00 PM target, it exits immediately
                          instead of burning Actions minutes waiting.
                          Defaults to 15.
+    SKIP_WAIT          - "true" to skip the wait-until-7PM logic entirely
+                         and go straight to the booking flow. Used
+                         automatically for manual test runs.
 
 Notes / limitations:
     foreUP's booking page is a JavaScript single-page app, and the exact
@@ -52,6 +54,7 @@ DAYS_OUT = 7       # tee times release exactly 7 days in advance
 NUM_PLAYERS = int(os.environ.get("NUM_PLAYERS", "4"))
 DRY_RUN = os.environ.get("DRY_RUN", "false").lower() == "true"
 EARLY_EXIT_MINUTES = int(os.environ.get("EARLY_EXIT_MINUTES", "15"))
+SKIP_WAIT = os.environ.get("SKIP_WAIT", "false").lower() == "true"
 
 USERNAME = os.environ.get("FOREUP_USERNAME")
 PASSWORD = os.environ.get("FOREUP_PASSWORD")
@@ -81,6 +84,13 @@ def snap(page, name: str) -> None:
 def wait_for_booking_window() -> datetime:
     now = datetime.now(TIMEZONE)
     target_today = now.replace(hour=TARGET_HOUR, minute=0, second=0, microsecond=0)
+
+    if SKIP_WAIT:
+        log("SKIP_WAIT is enabled (manual test run) -- skipping the wait-until-7PM "
+            "logic and proceeding straight to the booking flow.")
+        target_date = (now + timedelta(days=DAYS_OUT)).date()
+        log(f"Target tee time date: {target_date.isoformat()}")
+        return target_date
 
     minutes_until = (target_today - now).total_seconds() / 60
 
@@ -114,8 +124,6 @@ def login(page) -> None:
     page.goto(BOOKING_URL, wait_until="domcontentloaded", timeout=30000)
     snap(page, "01_initial_load")
 
-    # foreUP usually pops a login modal automatically, or shows a "Login"
-    # link/button if you're not authenticated yet.
     try:
         login_trigger = page.get_by_role("link", name="Login").or_(
             page.get_by_role("button", name="Login")
@@ -148,9 +156,6 @@ def login(page) -> None:
 
 
 def select_date(page, target_date) -> None:
-    # foreUP typically supports a URL query param for date, but the SPA can
-    # ignore it depending on version -- so we try the calendar UI as the
-    # reliable path, using an ARIA-accessible date button as the target.
     date_label = target_date.strftime("%B %-d, %Y")  # e.g. "August 14, 2026"
     log(f"Looking for date picker entry: {date_label}")
 
@@ -170,9 +175,6 @@ def select_date(page, target_date) -> None:
 
 MAX_SLOT_ATTEMPTS = 6  # how many times, in order, to try before giving up
 
-# Phrases foreUP (or similar booking systems) commonly show when a slot
-# you clicked has just been taken by someone else. If you see a run fail
-# with a screenshot showing different wording than this, add it here.
 UNAVAILABLE_PHRASES = [
     "no longer available",
     "unavailable",
@@ -207,10 +209,6 @@ def _page_shows_unavailable_error(page) -> bool:
 
 
 def _attempt_booking_on_open_slot(page, slot_label: str) -> bool:
-    """Assumes a slot's detail/modal view is already open. Tries to set
-    players and confirm. Returns True on apparent success, False if the
-    slot turned out to be unavailable or the confirm step failed."""
-
     _set_players(page)
     snap(page, "players_set")
 
@@ -252,9 +250,6 @@ def book_earliest_slot(page) -> bool:
     snap(page, "06_teetimes_loaded")
 
     for attempt in range(1, MAX_SLOT_ATTEMPTS + 1):
-        # Re-query the list fresh each attempt -- after a failed booking
-        # the page may re-render and remove the slot that just got taken,
-        # so we can't reuse a stale locator/index from a previous loop.
         time_tiles = page.locator("text=/\\d{1,2}:\\d{2}\\s*(AM|PM)/i")
         count = time_tiles.count()
         log(f"Attempt {attempt}: {count} time-like elements currently on the page.")
@@ -263,10 +258,6 @@ def book_earliest_slot(page) -> bool:
             log("No tee times available -- nothing left to try.")
             return False
 
-        # Slot index 0 is always "the earliest remaining" as long as we
-        # re-query after every failure, so we always grab .first here
-        # rather than incrementing an index (the taken slot disappears
-        # from the list, so the next-earliest naturally becomes .first).
         slot = time_tiles.first
         slot_label = slot.inner_text()
         log(f"Trying slot: {slot_label}")
@@ -280,8 +271,6 @@ def book_earliest_slot(page) -> bool:
             return True
 
         log(f"Attempt {attempt} for slot {slot_label} failed -- backing out and retrying.")
-        # Try to close whatever modal/detail view is open so the next loop
-        # iteration sees the fresh list of remaining tiles.
         for close_name in ["Close", "Cancel", "Back", "×"]:
             try:
                 page.get_by_role("button", name=close_name).first.click(timeout=3000)
