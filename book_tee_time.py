@@ -1,35 +1,22 @@
-Hillcrest Golf Club (foreUP) tee time auto-booker.
+# Hillcrest Golf Club (foreUP) tee time auto-booker.
 
-Logs in, waits until exactly 7:00:00 PM America/Denver time, then grabs the
-earliest available tee time for the target date (7 days out) and books it
-for the configured number of players.
-
-Environment variables required (set as GitHub Actions secrets):
-    FOREUP_USERNAME   - your foreUP login email
-    FOREUP_PASSWORD   - your foreUP login password
-
-Optional environment variables:
-    NUM_PLAYERS       - defaults to 4
-    DRY_RUN           - "true" to do everything except actually confirm the
-                         booking (useful for testing). Defaults to "false".
-    EARLY_EXIT_MINUTES - if the script starts more than this many minutes
-                         before the 7:00 PM target, it exits immediately
-                         instead of burning Actions minutes waiting.
-                         Defaults to 15.
-    SKIP_WAIT          - "true" to skip the wait-until-7PM logic entirely
-                         and go straight to the booking flow. Used
-                         automatically for manual test runs.
-
-Notes / limitations:
-    foreUP's booking page is a JavaScript single-page app, and the exact
-    element structure can vary by club configuration. This script uses
-    text-based matching (button/link text, ARIA roles) rather than fragile
-    CSS class names wherever possible, and takes a screenshot after every
-    major step so failures are easy to diagnose from the GitHub Actions
-    run artifacts. If a selector below stops matching (foreUP updated their
-    UI), check the "screenshots" artifact from the failed run and adjust
-    the corresponding SELECTOR/step below.
-"""
+# Logs in, waits until exactly 7:00:00 PM America/Denver time, then grabs
+# the earliest available tee time for the target date (7 days out) and
+# books it for the configured number of players.
+#
+# Required environment variables (set as GitHub Actions secrets):
+#   FOREUP_USERNAME   - your foreUP login email
+#   FOREUP_PASSWORD   - your foreUP login password
+#
+# Optional environment variables:
+#   NUM_PLAYERS         - defaults to 4
+#   DRY_RUN             - "true" to do everything except confirm the
+#                         booking. Defaults to "false".
+#   EARLY_EXIT_MINUTES  - if the script starts more than this many
+#                         minutes before the 7 PM target, it exits
+#                         immediately. Defaults to 15.
+#   SKIP_WAIT           - "true" to skip the wait-until-7PM logic
+#                         entirely, used for manual test runs.
 
 import os
 import sys
@@ -39,22 +26,17 @@ from zoneinfo import ZoneInfo
 
 from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 
-# ---------------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------------
-
 CLUB_ID = "20337"
 SCHEDULE_ID = "4283"
 BOOKING_URL = f"https://foreupsoftware.com/index.php/booking/{CLUB_ID}/{SCHEDULE_ID}#teetimes"
 
 TIMEZONE = ZoneInfo("America/Denver")
-TARGET_HOUR = 19  # 7:00 PM local time, when the booking window opens
-DAYS_OUT = 7       # tee times release exactly 7 days in advance
+TARGET_HOUR = 19
+DAYS_OUT = 7
 
 NUM_PLAYERS = int(os.environ.get("NUM_PLAYERS", "4"))
 DRY_RUN = os.environ.get("DRY_RUN", "false").lower() == "true"
 EARLY_EXIT_MINUTES = int(os.environ.get("EARLY_EXIT_MINUTES", "15"))
-SKIP_WAIT = os.environ.get("SKIP_WAIT", "false").lower() == "true"
 
 USERNAME = os.environ.get("FOREUP_USERNAME")
 PASSWORD = os.environ.get("FOREUP_PASSWORD")
@@ -77,9 +59,8 @@ def snap(page, name: str) -> None:
         log(f"Could not save screenshot {name}: {e}")
 
 
-# ---------------------------------------------------------------------------
-# Timing: figure out today's target date and wait until 7:00:00 PM
-# ---------------------------------------------------------------------------
+SKIP_WAIT = os.environ.get("SKIP_WAIT", "false").lower() == "true"
+
 
 def wait_for_booking_window() -> datetime:
     now = datetime.now(TIMEZONE)
@@ -114,10 +95,6 @@ def wait_for_booking_window() -> datetime:
     log(f"Target tee time date: {target_date.isoformat()}")
     return target_date
 
-
-# ---------------------------------------------------------------------------
-# Booking flow
-# ---------------------------------------------------------------------------
 
 def login(page) -> None:
     log("Navigating to booking page...")
@@ -156,7 +133,7 @@ def login(page) -> None:
 
 
 def select_date(page, target_date) -> None:
-    date_label = target_date.strftime("%B %-d, %Y")  # e.g. "August 14, 2026"
+    date_label = target_date.strftime("%B %-d, %Y")
     log(f"Looking for date picker entry: {date_label}")
 
     try:
@@ -173,7 +150,7 @@ def select_date(page, target_date) -> None:
     snap(page, "05_date_selected")
 
 
-MAX_SLOT_ATTEMPTS = 6  # how many times, in order, to try before giving up
+MAX_SLOT_ATTEMPTS = 6
 
 UNAVAILABLE_PHRASES = [
     "no longer available",
@@ -271,7 +248,7 @@ def book_earliest_slot(page) -> bool:
             return True
 
         log(f"Attempt {attempt} for slot {slot_label} failed -- backing out and retrying.")
-        for close_name in ["Close", "Cancel", "Back", "×"]:
+        for close_name in ["Close", "Cancel", "Back", "\u00d7"]:
             try:
                 page.get_by_role("button", name=close_name).first.click(timeout=3000)
                 break
