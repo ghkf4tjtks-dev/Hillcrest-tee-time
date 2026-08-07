@@ -270,7 +270,17 @@ def main() -> None:
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        context = browser.new_context()
+        context = browser.new_context(
+            user_agent=(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+            ),
+            viewport={"width": 1366, "height": 900},
+            locale="en-US",
+            extra_http_headers={
+                "Accept-Language": "en-US,en;q=0.9",
+            },
+        )
         page = context.new_page()
 
         try:
