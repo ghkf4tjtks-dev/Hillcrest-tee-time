@@ -102,34 +102,43 @@ def login(page) -> None:
     snap(page, "01_initial_load")
 
     try:
-        login_trigger = page.get_by_role("link", name="Login").or_(
-            page.get_by_role("button", name="Login")
+        login_trigger = page.get_by_role("link", name="Log In").or_(
+            page.get_by_role("button", name="Log In")
         )
         login_trigger.first.click(timeout=8000)
-        log("Clicked Login trigger.")
+        log("Clicked Log In trigger.")
     except PWTimeout:
-        log("No separate Login trigger found -- assuming login form is already visible.")
+        log("No separate Log In trigger found -- assuming login form is already visible.")
 
     snap(page, "02_login_form")
 
-    email_field = page.locator(
-        "input[type='email'], input[name*='user' i], input[placeholder*='email' i]"
-    ).first
-    password_field = page.locator("input[type='password']").first
+    email_field = page.get_by_placeholder("Email").first
+    password_field = page.get_by_placeholder("Password").first
 
     email_field.wait_for(state="visible", timeout=15000)
     email_field.fill(USERNAME)
     password_field.fill(PASSWORD)
     snap(page, "03_credentials_filled")
 
-    submit_btn = page.get_by_role("button", name="Login").or_(
-        page.get_by_role("button", name="Sign In")
-    )
+    submit_btn = page.get_by_role("button", name="Log In", exact=True)
     submit_btn.first.click()
 
     page.wait_for_load_state("networkidle", timeout=20000)
     snap(page, "04_after_login")
     log("Login submitted.")
+
+    try:
+        reserve_btn = page.get_by_role("link", name="Click Here to Reserve a Tee Time").or_(
+            page.get_by_role("button", name="Click Here to Reserve a Tee Time")
+        )
+        reserve_btn.first.click(timeout=8000)
+        log("Clicked 'Click Here to Reserve a Tee Time'.")
+        page.wait_for_load_state("networkidle", timeout=15000)
+    except PWTimeout:
+        log("Could not find the 'Click Here to Reserve a Tee Time' button -- "
+            "continuing in case we're already on the booking widget.")
+
+    snap(page, "05_after_reserve_click")
 
 
 def select_date(page, target_date) -> None:
@@ -147,7 +156,7 @@ def select_date(page, target_date) -> None:
         page.get_by_role("button", name=day_num, exact=True).first.click(timeout=10000)
 
     page.wait_for_load_state("networkidle", timeout=15000)
-    snap(page, "05_date_selected")
+    snap(page, "06_date_selected")
 
 
 MAX_SLOT_ATTEMPTS = 6
@@ -224,7 +233,7 @@ def _attempt_booking_on_open_slot(page, slot_label: str) -> bool:
 def book_earliest_slot(page) -> bool:
     log("Waiting for tee time tiles to load...")
     page.wait_for_selector("text=/\\d{1,2}:\\d{2}\\s*(AM|PM)/i", timeout=20000)
-    snap(page, "06_teetimes_loaded")
+    snap(page, "07_teetimes_loaded")
 
     for attempt in range(1, MAX_SLOT_ATTEMPTS + 1):
         time_tiles = page.locator("text=/\\d{1,2}:\\d{2}\\s*(AM|PM)/i")
@@ -240,7 +249,7 @@ def book_earliest_slot(page) -> bool:
         log(f"Trying slot: {slot_label}")
         slot.click()
         page.wait_for_load_state("networkidle", timeout=15000)
-        snap(page, f"07_attempt{attempt}_slot_selected")
+        snap(page, f"08_attempt{attempt}_slot_selected")
 
         success = _attempt_booking_on_open_slot(page, slot_label)
         if success:
@@ -255,7 +264,7 @@ def book_earliest_slot(page) -> bool:
             except Exception:
                 continue
         page.wait_for_timeout(1000)
-        snap(page, f"07_attempt{attempt}_backed_out")
+        snap(page, f"08_attempt{attempt}_backed_out")
 
     log(f"Exhausted {MAX_SLOT_ATTEMPTS} attempts without a successful booking.")
     return False
