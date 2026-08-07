@@ -154,20 +154,22 @@ def login(page) -> None:
 
 
 def select_date(page, target_date) -> None:
-    date_label = target_date.strftime("%B %-d, %Y")
-    log(f"Looking for date picker entry: {date_label}")
+    day_num = str(target_date.day)
+    log(f"Clicking calendar day {day_num}...")
 
     try:
-        page.get_by_role("button", name=date_label).click(timeout=10000)
+        page.get_by_text(day_num, exact=True).first.click(timeout=10000)
+        page.wait_for_load_state("networkidle", timeout=15000)
+        log(f"Clicked day {day_num} via text match.")
     except PWTimeout:
-        log(
-            "Could not find an exact date-label button; trying the day-of-month "
-            "number as a fallback."
-        )
-        day_num = str(target_date.day)
-        page.get_by_role("button", name=day_num, exact=True).first.click(timeout=10000)
+        log(f"Text match for day {day_num} failed -- trying role=button as a fallback.")
+        try:
+            page.get_by_role("button", name=day_num, exact=True).first.click(timeout=10000)
+            page.wait_for_load_state("networkidle", timeout=15000)
+            log(f"Clicked day {day_num} via button role.")
+        except PWTimeout:
+            log(f"Could not select day {day_num} either way -- proceeding anyway.")
 
-    page.wait_for_load_state("networkidle", timeout=15000)
     snap(page, "06_date_selected")
 
 
