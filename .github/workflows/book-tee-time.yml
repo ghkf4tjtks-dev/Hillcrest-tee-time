@@ -39,6 +39,7 @@ jobs:
           FOREUP_PASSWORD: ${{ secrets.FOREUP_PASSWORD }}
           NUM_PLAYERS: "4"
           DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+          SKIP_WAIT: ${{ github.event_name == 'workflow_dispatch' }}
         run: python book_tee_time.py
 
       - name: Upload screenshots (always, even on failure)
