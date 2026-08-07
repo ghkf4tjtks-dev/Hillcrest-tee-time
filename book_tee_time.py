@@ -1,7 +1,7 @@
 # Hillcrest Golf Club (foreUP) tee time auto-booker.
 
 # Logs in, waits until exactly 7:00:00 PM America/Denver time, then grabs
-# the earliest available tee time for the target date (7 days out) and
+# the earliest available tee time for the target date (8 days out) and
 # books it for the configured number of players.
 #
 # Required environment variables (set as GitHub Actions secrets):
@@ -33,8 +33,9 @@ SCHEDULE_ID = "4283"
 BOOKING_URL = f"https://foreupsoftware.com/index.php/booking/{CLUB_ID}/{SCHEDULE_ID}#teetimes"
 
 TIMEZONE = ZoneInfo("America/Denver")
-TARGET_HOUR = 19
-DAYS_OUT = 7
+TARGET_HOUR = 19  # 7:00 PM local time, when the booking window opens
+DAYS_OUT = 8       # confirmed empirically: the 7 PM opening releases the
+                   # date 8 days out, not 7 (e.g. Aug 7 7PM opens Aug 15)
 
 NUM_PLAYERS = int(os.environ.get("NUM_PLAYERS", "4"))
 HOLES = os.environ.get("HOLES", "9")
