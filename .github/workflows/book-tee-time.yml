@@ -1,0 +1,50 @@
+name: Book Hillcrest Tee Time
+
+on:
+  schedule:
+    - cron: "58 0 * * *"   # ~6:58 PM MDT (summer)
+    - cron: "58 1 * * *"   # ~6:58 PM MST (winter)
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (stop before final booking confirmation)"
+        required: false
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+jobs:
+  book:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          playwright install --with-deps chromium
+
+      - name: Run booking script
+        env:
+          FOREUP_USERNAME: ${{ secrets.FOREUP_USERNAME }}
+          FOREUP_PASSWORD: ${{ secrets.FOREUP_PASSWORD }}
+          NUM_PLAYERS: "4"
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        run: python book_tee_time.py
+
+      - name: Upload screenshots (always, even on failure)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-${{ github.run_id }}
+          path: screenshots/
+          retention-days: 14
