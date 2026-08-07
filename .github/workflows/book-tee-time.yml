@@ -38,6 +38,8 @@ jobs:
           FOREUP_USERNAME: ${{ secrets.FOREUP_USERNAME }}
           FOREUP_PASSWORD: ${{ secrets.FOREUP_PASSWORD }}
           NUM_PLAYERS: "4"
+          HOLES: "9"
+          CART: "Yes"
           DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
           SKIP_WAIT: ${{ github.event_name == 'workflow_dispatch' }}
         run: python book_tee_time.py
