@@ -10,6 +10,8 @@
 #
 # Optional environment variables:
 #   NUM_PLAYERS         - defaults to 4
+#   HOLES               - "9" or "18", defaults to "9"
+#   CART                - "Yes" or "No", defaults to "Yes"
 #   DRY_RUN             - "true" to do everything except confirm the
 #                         booking. Defaults to "false".
 #   EARLY_EXIT_MINUTES  - if the script starts more than this many
@@ -35,6 +37,8 @@ TARGET_HOUR = 19
 DAYS_OUT = 7
 
 NUM_PLAYERS = int(os.environ.get("NUM_PLAYERS", "4"))
+HOLES = os.environ.get("HOLES", "9")
+CART = os.environ.get("CART", "Yes")
 DRY_RUN = os.environ.get("DRY_RUN", "false").lower() == "true"
 EARLY_EXIT_MINUTES = int(os.environ.get("EARLY_EXIT_MINUTES", "15"))
 
@@ -120,10 +124,18 @@ def login(page) -> None:
     password_field.fill(PASSWORD)
     snap(page, "03_credentials_filled")
 
-    submit_btn = page.get_by_role("button", name="Log In", exact=True)
-    submit_btn.first.click()
+    password_field.press("Enter")
+    try:
+        page.wait_for_load_state("networkidle", timeout=8000)
+    except PWTimeout:
+        pass
 
-    page.wait_for_load_state("networkidle", timeout=20000)
+    if password_field.is_visible():
+        log("Enter key did not submit the login form -- trying a direct button click.")
+        submit_btn = page.get_by_role("button", name="Log In", exact=True)
+        submit_btn.last.click(timeout=10000)
+        page.wait_for_load_state("networkidle", timeout=20000)
+
     snap(page, "04_after_login")
     log("Login submitted.")
 
@@ -171,6 +183,14 @@ UNAVAILABLE_PHRASES = [
 ]
 
 
+def _set_holes(page) -> None:
+    try:
+        page.get_by_role("button", name=HOLES, exact=True).click(timeout=5000)
+        log(f"Set holes to {HOLES}.")
+    except Exception:
+        log("Could not find a holes selector -- leaving default and continuing.")
+
+
 def _set_players(page) -> None:
     try:
         players_dropdown = page.locator(
@@ -186,6 +206,14 @@ def _set_players(page) -> None:
             log("Could not find a players selector -- leaving default and continuing.")
 
 
+def _set_cart(page) -> None:
+    try:
+        page.get_by_role("button", name=CART, exact=True).click(timeout=5000)
+        log(f"Set cart to {CART}.")
+    except Exception:
+        log("Could not find a cart selector -- leaving default and continuing.")
+
+
 def _page_shows_unavailable_error(page) -> bool:
     try:
         body_text = page.inner_text("body").lower()
@@ -195,14 +223,18 @@ def _page_shows_unavailable_error(page) -> bool:
 
 
 def _attempt_booking_on_open_slot(page, slot_label: str) -> bool:
+    _set_holes(page)
     _set_players(page)
+    _set_cart(page)
     snap(page, "players_set")
 
     if _page_shows_unavailable_error(page):
         log(f"Slot {slot_label} shows an unavailable message before confirming.")
         return False
 
-    book_btn = page.get_by_role("button", name="Book Now").or_(
+    book_btn = page.get_by_role("button", name="Book Time", exact=True).or_(
+        page.get_by_role("button", name="Book Now")
+    ).or_(
         page.get_by_role("button", name="Book Tee Time")
     ).or_(
         page.get_by_role("button", name="Reserve")
